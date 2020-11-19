@@ -19,11 +19,11 @@ LIGHT_ORANGE = '#FAE0C3';
 class Maze:
 
     # Actions
-    STAY       = 0
-    MOVE_LEFT  = 1
-    MOVE_RIGHT = 2
-    MOVE_UP    = 3
-    MOVE_DOWN  = 4
+    STAY       = 4
+    MOVE_LEFT  = 3
+    MOVE_RIGHT = 1
+    MOVE_UP    = 2
+    MOVE_DOWN  = 0
 
     # Give names to actions
     actions_names = {
@@ -114,6 +114,9 @@ class Maze:
         row_m = self.states[state][2];
         col_m = self.states[state][3];
         actions = dict();
+        
+        actions[self.STAY]  = (0,0);
+
 
         # Is the future position an impossible one ?
         if (row_m == 0):
@@ -207,7 +210,7 @@ class Maze:
                         rewards[s,a] = self.IMPOSSIBLE_REWARD;
                     # Reward for reaching the exit
 
-                    elif s == next_s and self.maze[next_s_inds[2],next_s_inds[3]] == 2:
+                    elif s == next_s and self.maze[next_s_inds[0],next_s_inds[1]] == 2:
                         rewards[s,a] = self.GOAL_REWARD;
 
                     elif next_s_inds[0] == next_s_inds[2] and next_s_inds[1] == next_s_inds[3]:
@@ -243,9 +246,9 @@ class Maze:
 
                 minotaur_moves = self.__actions_minotaur(s)
 
-                m =  random.sample(list(minotaur_moves), 1)[0]
+                #m =  random.sample(list(minotaur_moves), 1)[0]
 
-                minotaur_action = minotaur_moves[m]
+                minotaur_action = minotaur_moves[4]
 
 
 
@@ -485,20 +488,24 @@ def animate_solution(maze, path):
 
         grid.get_celld()[player_pos].set_facecolor(LIGHT_ORANGE)
         grid.get_celld()[player_pos].get_text().set_text('Player')
+        
+        grid.get_celld()[minotaur_pos].set_facecolor(LIGHT_RED)
+        grid.get_celld()[minotaur_pos].get_text().set_text('M')
+        
         if i > 0:
             if player_pos == player_past_pos:
                 grid.get_celld()[player_pos].set_facecolor(LIGHT_GREEN)
-                grid.get_celld()[player_pos].get_text().set_text('Player is out')
+                #grid.get_celld()[player_pos].get_text().set_text('Player is out')
             else:
                 grid.get_celld()[player_past_pos].set_facecolor(col_map[maze[player_past_pos]])
                 grid.get_celld()[player_past_pos].get_text().set_text('')
 
             if minotaur_pos == minotaur_past_pos:
                 grid.get_celld()[minotaur_pos].set_facecolor(LIGHT_RED)
-                grid.get_celld()[minotaur_pos].get_text().set_text('M is out')
+                #grid.get_celld()[minotaur_pos].get_text().set_text('M is out')
             else:
                 grid.get_celld()[minotaur_past_pos].set_facecolor(col_map[maze[minotaur_past_pos]])
-                grid.get_celld()[minotaur_past_pos].get_text().set_text('M')
+                grid.get_celld()[minotaur_past_pos].get_text().set_text('')
 
         display.display(fig)
         display.clear_output(wait=True)
