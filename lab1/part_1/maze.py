@@ -247,19 +247,12 @@ class Maze:
             while t < horizon-1 and not self.goal_reached(s):
 
                 minotaur_moves = self.__actions_minotaur(s)
-
                 m =  random.sample(list(minotaur_moves), 1)[0]
-
                 minotaur_action = minotaur_moves[m]
-
-
-
                 # Move to next state given the policy and the current state
                 next_s = self.__move(s, policy[s,t], minotaur_action);
                 # Add the position in the maze corresponding to the next state
                 # to the path
-
-
 
                 path.append(self.states[next_s])
                 # Update time and state for next iteration
@@ -273,16 +266,27 @@ class Maze:
             # Add the starting position in the maze to the path
             path.append(start);
             # Move to next state given the policy and the current state
-            next_s = self.__move(s,policy[s]);
+            minotaur_moves = self.__actions_minotaur(s)
+            m =  random.sample(list(minotaur_moves), 1)[0]
+            minotaur_action = minotaur_moves[m]
+
+            # Move to next state given the policy and the current state
+            next_s = self.__move(s, policy[s], minotaur_action);
             # Add the position in the maze corresponding to the next state
             # to the path
             path.append(self.states[next_s]);
             # Loop while state is not the goal state
-            while s != next_s:
+            while not self.goal_reached(s):#s != next_s:
                 # Update state
                 s = next_s;
                 # Move to next state given the policy and the current state
-                next_s = self.__move(s,policy[s]);
+                minotaur_moves = self.__actions_minotaur(s)
+                m =  random.sample(list(minotaur_moves), 1)[0]
+                minotaur_action = minotaur_moves[m]
+
+                # Move to next state given the policy and the current state
+
+                next_s = self.__move(s, policy[s], minotaur_action);
                 # Add the position in the maze corresponding to the next state
                 # to the path
                 path.append(self.states[next_s])
@@ -557,8 +561,20 @@ if __name__ == '__main__':
     # Create an environment maze
     env = Maze(maze)
 
-    #env.show()
-    # Finite horizon
+    gamma = 29/30
+    eps = 0.5
+    # Solve the MDP problem with value iteration
+    print('start val it')
+    V, policy= value_iteration(env,gamma,eps);
+    print('done val it')
+    # Simulate the shortest path starting from position A
+    method = 'ValIter';
+    start  = (0,0,6,5);
+    path = env.simulate(start, policy, method);
+
+    input('stopp')
+
+    # Dynamic programming
     horizon = 20
     # Solve the MDP problem with dynamic programming
     V, policy= dynamic_programming(env, horizon)
