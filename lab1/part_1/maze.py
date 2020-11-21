@@ -40,16 +40,18 @@ class Maze:
     IMPOSSIBLE_REWARD = -100
     DIE_REWARD = -200
 
-    def __init__(self, maze, weights=None, random_rewards=False):
+    def __init__(self, maze, minotaur_can_stay = False):
         """ Constructor of the environment Maze.
         """
         self.maze                     = maze;
+        self.minotaur_can_stay        = minotaur_can_stay;
         self.actions                  = self.__actions();
         self.states, self.map         = self.__states(); #map between row col and index
         self.n_actions                = len(self.actions);
         self.n_states                 = len(self.states);
         self.transition_probabilities = self.__transitions();
         self.rewards                  = self.__rewards();
+
 
     def __actions(self):
         actions = dict();
@@ -82,7 +84,6 @@ class Maze:
     def __move(self, state, action, minotaur_action):
         """ Makes a step in the maze, given a current position and an action.
             If the action STAY or an inadmissible action is used, the agent stays in place.
-
             :return tuple next_cell: Position (x,y) on the maze that agent transitions to.
         """
 
@@ -112,8 +113,9 @@ class Maze:
         row_m = self.states[state][2];
         col_m = self.states[state][3];
         actions = dict();
-        
-        #actions[self.STAY]  = (0,0);
+
+        if self.minotaur_can_stay:
+            actions[self.STAY]  = (0,0);
 
 
         # Is the future position an impossible one ?
@@ -206,11 +208,11 @@ class Maze:
                     #Reward for being eaten by the Minotaur
                     if next_s_inds[0] == next_s_inds[2] and next_s_inds[1] == next_s_inds[3]:
                         rewards[s,a] += 1/len_act_m*self.DIE_REWARD;
-                    
+
                     # Reward for hitting a wall
                     elif  a != self.STAY and next_s_inds[0]== self.states[s][0] and next_s_inds[1]== self.states[s][1]:
                         rewards[s,a] += 1/len_act_m*self.IMPOSSIBLE_REWARD;
-                    
+
                     # Reward for reaching the exit
                     elif self.maze[next_s_inds[0],next_s_inds[1]] == 2:
                         rewards[s,a] += 1/len_act_m*self.GOAL_REWARD;
@@ -469,6 +471,9 @@ def animate_solution(maze, path):
                      loc=(0,0),
                      edges='closed');
 
+    #grid.auto_set_font_size(False)
+    #grid.set_fontsize(12)
+
     # Modify the hight and width of the cells in the table
     tc = grid.properties()['children']
     for cell in tc:
@@ -486,39 +491,58 @@ def animate_solution(maze, path):
         player_past_pos = (path[i-1][:2])
         minotaur_past_pos = (path[i-1][2:])
 
-        grid.get_celld()[player_pos].set_facecolor(LIGHT_ORANGE)
-        grid.get_celld()[player_pos].get_text().set_text('Player')
-        
-        grid.get_celld()[minotaur_pos].set_facecolor(LIGHT_RED)
-        grid.get_celld()[minotaur_pos].get_text().set_text('M')
-        
-        if i > 0:
-            if player_pos == minotaur_pos:
-                 grid.get_celld()[player_pos].set_facecolor(LIGHT_RED)
-                 grid.get_celld()[player_pos].get_text().set_text('PLAYER DIED')
-        
-            if player_pos == player_past_pos:
-                grid.get_celld()[player_pos].set_facecolor(LIGHT_GREEN)
-                #grid.get_celld()[player_pos].get_text().set_text('Player is out')
-            else:
-                grid.get_celld()[player_past_pos].set_facecolor(col_map[maze[player_past_pos]])
-                grid.get_celld()[player_past_pos].get_text().set_text('')
+        if i >= 0:
+            player_pos_text = grid.get_celld()[player_pos].get_text().get_text()
+            minotaur_pos_text = grid.get_celld()[minotaur_pos].get_text().get_text()
+            #print(minotaur_pos_text)
+            #pdb.set_trace()
 
-            if minotaur_pos == minotaur_past_pos:
-                grid.get_celld()[minotaur_pos].set_facecolor(LIGHT_RED)
-                #grid.get_celld()[minotaur_pos].get_text().set_text('M is out')
+
+            if player_pos_text == '':
+                #grid.get_celld()[player_pos].set_facecolor(LIGHT_GREEN)
+                grid.get_celld()[player_pos].get_text().set_text('P ' + str(i))
             else:
-                grid.get_celld()[minotaur_past_pos].set_facecolor(col_map[maze[minotaur_past_pos]])
-                grid.get_celld()[minotaur_past_pos].get_text().set_text('')
+                if 'P' in player_pos_text and 'M' in player_pos_text:
+                    text_split = player_pos_text.split('\n')
+                    grid.get_celld()[player_pos].get_text().set_text(text_split[0] +', ' + str(i) + text_split[1])
+                    grid.get_celld()[player_pos].get_text().set_color('purple')
+
+                elif 'P' in player_pos_text:
+                    grid.get_celld()[player_pos].get_text().set_text(player_pos_text +', ' + str(i))
+                else:
+                    #text_split = player_pos_text.split('\n')
+                    grid.get_celld()[player_pos].get_text().set_text('P ' + str(i) +'\n'+ player_pos_text)
+                    grid.get_celld()[player_pos].get_text().set_color('purple')
+
+            if minotaur_pos_text == '':
+                #grid.get_celld()[player_pos].set_facecolor(LIGHT_GREEN)
+                grid.get_celld()[minotaur_pos].get_text().set_text('M ' + str(i))
+                grid.get_celld()[minotaur_pos].get_text().set_color('red')
+            else:
+                if 'P' in minotaur_pos_text and 'M' in minotaur_pos_text:
+                    text_split = minotaur_pos_text.split('\n')
+                    grid.get_celld()[minotaur_pos].get_text().set_text(text_split[0] + text_split[1]+ ', ' +str(i))
+                    grid.get_celld()[minotaur_pos].get_text().set_color('purple')
+
+                elif 'M' in minotaur_pos_text:
+                    grid.get_celld()[minotaur_pos].get_text().set_text(minotaur_pos_text +', ' + str(i))
+                    grid.get_celld()[minotaur_pos].get_text().set_color('red')
+
+                else: # aleady a P there
+                    #text_split = player_pos_text.split('\n')
+                    grid.get_celld()[player_pos].get_text().set_text( minotaur_pos_text +'\n' +' M ' + str(i) )
+                    grid.get_celld()[minotaur_pos].get_text().set_color('purple')
+
 
         display.display(fig)
         display.clear_output(wait=True)
         time.sleep(1)
+    plt.savefig('Q1_a_optimal_path.png')
 
 
 
 
-def main():
+if __name__ == '__main__':
     maze = np.array([
         [0, 0, 1, 0, 0, 0, 0, 0],
         [0, 0, 1, 0, 0, 1, 0, 0],
@@ -546,6 +570,3 @@ def main():
 
     # Show the shortest path
     animate_solution(maze, path)
-
-
-main()
