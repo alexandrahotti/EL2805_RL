@@ -173,19 +173,64 @@ class City:
 
 
 
-def sample_eps_greedy_action(Q, s, epsilon):
+def sample_eps_greedy_action(Q, s, eps):
 
     rn = np.random.uniform(0,1)
 
-    if rn < epsilon:
+    if rn < eps:
         # should sample uniformly here
         return random.sample(range(0,len(Q[s,:])), 1)[0]
     else:
         return np.argmax(Q[s,:])
 
 
+def sample_random_action(Q,s):
 
-def Q_learning(env, gamma, epsilon, lr, no_iterations, start_state):
+    return random.sample(range(0,len(Q[s,:])), 1)[0]
+
+
+def SARSA(env, eps, gamma, start_state, no_iterations):
+
+    r   = env.rewards;
+    n_states  = env.n_states;
+    n_actions = env.n_actions;
+    states  = env.states;
+    actions = env.actions;
+
+    Q_initial_state = np.zeros(no_iterations)
+
+    Q  = np.zeros((n_states, n_actions));
+    nv  = np.zeros((n_states, n_actions)); # no visits of (s,a)
+    pi  = np.random.randint(n_actions, size = n_states ); # Randomly initilize the policy
+
+    s = env.map[start_state]
+    a = sample_eps_greedy_action(Q, s, eps)
+
+    for t in range(1, no_iterations):
+
+        nv[s,a] += 1 # not really using this right now. maybe same as before
+
+        alpha = 1/(nv[s,a]**(2/3))
+
+        # Generate next r_t, s_t+1 and a_t+1
+        police_moves = env.actions_police(s)
+        p =  random.sample(list(police_moves), 1)[0]
+        police_action = police_moves[p]
+
+        next_s = env.move(s, a, police_action)
+        next_a = sample_eps_greedy_action(Q, next_s, eps)
+
+        Q[s,a] = Q[s,a] + alpha * (r[s,a] + gamma * Q[next_s, next_a] - Q[s,a])
+        Q_initial_state[t] = np.max(Q[env.map[start_state]])
+
+        s = next_s
+        a = next_a
+
+
+    return Q, Q_initial_state
+
+
+def Q_learning(env, gamma, epsilon, no_iterations, start_state):
 
     r         = env.rewards;
     n_states  = env.n_states;
@@ -197,12 +242,13 @@ def Q_learning(env, gamma, epsilon, lr, no_iterations, start_state):
     nv  = np.zeros((n_states, n_actions)); # no visits of (s,a)
 
     s = env.map[start_state]
-    a = sample_eps_greedy_action(Q, s, epsilon)
+    a = sample_random_action(Q,s)
 
     Q_initial_state = np.zeros(no_iterations)
 
 
-    for t in range(0, no_iterations):
+    for t in range(1, no_iterations):
+        #lr = 1/t # remove?
 
         nv[s,a] += 1
 
@@ -218,7 +264,7 @@ def Q_learning(env, gamma, epsilon, lr, no_iterations, start_state):
         Q_initial_state[t] = np.max(Q[env.map[start_state]])
 
         s = next_s
-        a = sample_eps_greedy_action(Q, s, epsilon)
+        a = sample_random_action(Q,s)
 
     return Q, Q_initial_state
 
@@ -246,15 +292,26 @@ if __name__ == '__main__':
 
     # Create an environment maze
     env = City(city)
-
     start_state = (0,0,3,3);
+
+    # Q-learning #
     gamma = 0.1
     epsilon = 0.3
-    lr = 0.1
     no_iterations = 10000000
-    Q, Q_initial_state = Q_learning(env, gamma, epsilon, lr, no_iterations, start_state)
+    Q, Q_initial_state = Q_learning(env, gamma, epsilon, no_iterations, start_state)
 
     title = "Value Function over time for the initial state (0,0,3,3)"
     x_axis = 'iteration'
     y_axis = "Value"
     plot(Q_initial_state,title,x_axis,y_axis)#, save_fig = False, fig_name = None)
+
+    # SARSA #
+    eps = 0.1
+    gamma = 0.1
+    no_iterations = 10000000
+    # bar since the best eps-greedy policy
+    Q_bar, Q_initial_state = SARSA(env, eps, gamma, start_state, no_iterations)
+    #title = "state value Function over time for the initial state (0,0,3,3)"
+    #x_axis = 'iteration'
+    #y_axis = "Value"
+    #plot(Q_initial_state,title,x_axis,y_axis)#, save_fig = False, fig_name = None)
