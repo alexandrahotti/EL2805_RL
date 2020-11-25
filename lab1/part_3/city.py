@@ -144,7 +144,7 @@ class City:
         return actions
 
 
-    def __rewards(self):
+    def __rewards_old(self):
 
         rewards = np.zeros((self.n_states, self.n_actions));
 
@@ -171,6 +171,38 @@ class City:
                         rewards[s,a] = self.STEP_REWARD;
         return rewards;
 
+    def __rewards(self):
+
+        rewards = np.zeros((self.n_states, self.n_actions));
+
+        for s in range(self.n_states):
+            for a in range(self.n_actions):
+                minotaur_moves = self.actions_police(s)
+                len_act_m=len(minotaur_moves)
+
+                for m in minotaur_moves:
+                    minotaur_action = minotaur_moves[m]
+
+                    next_s = self.move(s,a, minotaur_action);
+
+                    next_s_inds = self.states[next_s]
+
+                    #Reward for being eaten by the Minotaur
+                    if next_s_inds[0] == next_s_inds[2] and next_s_inds[1] == next_s_inds[3]:
+                        rewards[s,a] += 1/len_act_m*self.CAUGHT_REWARD;
+
+                    # Reward for hitting a wall
+                    elif  a != self.STAY and next_s_inds[0]== self.states[s][0] and next_s_inds[1]== self.states[s][1]:
+                        rewards[s,a] += 1/len_act_m*self.IMPOSSIBLE_REWARD;
+
+                    # Reward for reaching the exit
+                    elif self.city[next_s_inds[0],next_s_inds[1]] == 2:
+                        rewards[s,a] += 1/len_act_m*self.ROBBING_REWARD;
+
+                    # Reward for taking a step to an empty cell that is not the exit
+                    else:
+                        rewards[s,a] += 1/len_act_m * self.STEP_REWARD;
+        return rewards;
 
 
 def sample_eps_greedy_action(Q, s, eps):
@@ -230,7 +262,7 @@ def SARSA(env, eps, gamma, start_state, no_iterations):
     return Q, Q_initial_state
 
 
-def Q_learning(env, gamma, epsilon, no_iterations, start_state):
+def Q_learning(env, gamma, no_iterations, start_state):
 
     r         = env.rewards;
     n_states  = env.n_states;
@@ -296,9 +328,9 @@ if __name__ == '__main__':
 
     # Q-learning #
     gamma = 0.1
-    epsilon = 0.3
+    #epsilon = 0.3
     no_iterations = 10000000
-    Q, Q_initial_state = Q_learning(env, gamma, epsilon, no_iterations, start_state)
+    Q, Q_initial_state = Q_learning(env, gamma, no_iterations, start_state)
 
     title = "Value Function over time for the initial state (0,0,3,3)"
     x_axis = 'iteration'
