@@ -38,7 +38,7 @@ class Maze:
     STEP_REWARD = -1
     GOAL_REWARD = 0
     IMPOSSIBLE_REWARD = -100
-    DIE_REWARD = -200
+    DIE_REWARD = -99
 
     def __init__(self, maze, minotaur_can_stay = False):
         """ Constructor of the environment Maze.
@@ -51,6 +51,7 @@ class Maze:
         self.n_states                 = len(self.states);
         self.transition_probabilities = self.__transitions();
         self.rewards                  = self.__rewards();
+
 
 
     def __actions(self):
@@ -68,6 +69,10 @@ class Maze:
         end = False;
         s = 0;
 
+        states[s] = "Terminal";
+        map["Terminal"] = s;
+        s += 1;
+
         for i in range(self.maze.shape[0]):
             for j in range(self.maze.shape[1]):
 
@@ -81,14 +86,13 @@ class Maze:
 
         return states, map
 
-    def __move(self, state, action, minotaur_action):
+    def __move(self, state, action, minotaur_action, terminal = False):
         """ Makes a step in the maze, given a current position and an action.
             If the action STAY or an inadmissible action is used, the agent stays in place.
             :return tuple next_cell: Position (x,y) on the maze that agent transitions to.
         """
 
         # Compute the future position given current (state, action
-
         row = self.states[state][0] + self.actions[action][0];
         col = self.states[state][1] + self.actions[action][1];
 
@@ -181,12 +185,21 @@ class Maze:
         # are deterministic.
         for s in range(self.n_states):
             for a in range(self.n_actions):
-                minotaur_moves = self.__actions_minotaur(s)
 
-                for m in minotaur_moves:
-                    minotaur_action = minotaur_moves[m]
-                    next_s = self.__move(s, a, minotaur_action);
-                    transition_probabilities[next_s, s, a] = 1/len(minotaur_moves);
+                if "Terminal" == self.states[s]:
+                    if a == self.STAY:
+                        transition_probabilities[s, s, a] = 1;
+                    else:
+                        transition_probabilities[:, s, a] = 0;
+                else:
+                    minotaur_moves = self.__actions_minotaur(s)
+                    for m in minotaur_moves:
+                        minotaur_action = minotaur_moves[m]
+                        next_s = self.__move(s, a, minotaur_action);
+                        transition_probabilities[next_s, s, a] = 1/len(minotaur_moves);
+
+
+
         return transition_probabilities;
 
     def __rewards(self):
@@ -195,38 +208,44 @@ class Maze:
 
         for s in range(self.n_states):
             for a in range(self.n_actions):
-                minotaur_moves = self.__actions_minotaur(s)
-                len_act_m=len(minotaur_moves)
 
-                for m in minotaur_moves:
-                    minotaur_action = minotaur_moves[m]
-
-                    next_s = self.__move(s,a, minotaur_action);
-
-                    next_s_inds = self.states[next_s]
-
-                    #Reward for being eaten by the Minotaur
-                    if next_s_inds[0] == next_s_inds[2] and next_s_inds[1] == next_s_inds[3]:
-                        rewards[s,a] += 1/len_act_m*self.DIE_REWARD;
-
-                    # Reward for hitting a wall
-                    elif  a != self.STAY and next_s_inds[0]== self.states[s][0] and next_s_inds[1]== self.states[s][1]:
-                        rewards[s,a] += 1/len_act_m*self.IMPOSSIBLE_REWARD;
-
-                    # Reward for reaching the exit
-                    elif self.maze[next_s_inds[0],next_s_inds[1]] == 2:
-                        rewards[s,a] += 1/len_act_m*self.GOAL_REWARD;
-
-
-                    # Reward for taking a step to an empty cell that is not the exit
+                if "Terminal" == self.states[s]:
+                    if a == self.STAY:
+                        rewards[s,a] = 0
                     else:
-                        rewards[s,a] += 1/len_act_m * self.STEP_REWARD;
+                        rewards[s,a] = -1
+                else:
+
+                    minotaur_moves = self.__actions_minotaur(s)
+                    len_act_m=len(minotaur_moves)
+
+                    for m in minotaur_moves:
+                        minotaur_action = minotaur_moves[m]
+
+                        next_s = self.__move(s,a, minotaur_action);
+
+                        next_s_inds = self.states[next_s]
+
+                        #Reward for being eaten by the Minotaur
+                        if next_s_inds[0] == next_s_inds[2] and next_s_inds[1] == next_s_inds[3]:
+                            rewards[s,a] += 1/len_act_m*self.DIE_REWARD;
+
+                        # Reward for hitting a wall
+                        elif  a != self.STAY and next_s_inds[0]== self.states[s][0] and next_s_inds[1]== self.states[s][1]:
+                            rewards[s,a] += 1/len_act_m*self.IMPOSSIBLE_REWARD;
+
+                        # Reward for reaching the exit
+                        elif self.maze[next_s_inds[0],next_s_inds[1]] == 2:
+                            rewards[s,a] += 1/len_act_m*self.GOAL_REWARD;
+
+                        # Reward for taking a step to an empty cell that is not the exit
+                        else:
+                            rewards[s,a] += 1/len_act_m * self.STEP_REWARD;
         return rewards;
 
     def goal_reached(self, s):
         state_indicies = self.states[s];
         return self.maze[state_indicies[0],state_indicies[1]] == 2 and self.maze[state_indicies[2],state_indicies[3]] != 2
-
 
 
     def simulate(self, start, policy, method):
@@ -276,7 +295,7 @@ class Maze:
             # to the path
             path.append(self.states[next_s]);
             # Loop while state is not the goal state
-            while not self.goal_reached(s):#s != next_s:
+            while not self.goal_reached(s):# s != next_s: #
                 # Update state
                 s = next_s;
                 # Move to next state given the policy and the current state
@@ -508,7 +527,7 @@ def animate_solution(maze, path):
             else:
                 if 'P' in player_pos_text and 'M' in player_pos_text:
                     text_split = player_pos_text.split('\n')
-                    grid.get_celld()[player_pos].get_text().set_text(text_split[0] +', ' + str(i) + text_split[1])
+                    grid.get_celld()[player_pos].get_text().set_text(text_split[0] +', ' + str(i) +'\n'+ text_split[1])
                     grid.get_celld()[player_pos].get_text().set_color('purple')
 
                 elif 'P' in player_pos_text:
@@ -525,7 +544,7 @@ def animate_solution(maze, path):
             else:
                 if 'P' in minotaur_pos_text and 'M' in minotaur_pos_text:
                     text_split = minotaur_pos_text.split('\n')
-                    grid.get_celld()[minotaur_pos].get_text().set_text(text_split[0] + text_split[1]+ ', ' +str(i))
+                    grid.get_celld()[minotaur_pos].get_text().set_text(text_split[0] +'\n'+ text_split[1]+ ', ' +str(i))
                     grid.get_celld()[minotaur_pos].get_text().set_color('purple')
 
                 elif 'M' in minotaur_pos_text:
@@ -564,15 +583,15 @@ if __name__ == '__main__':
     gamma = 29/30
     eps = 0.5
     # Solve the MDP problem with value iteration
-    print('start val it')
-    V, policy= value_iteration(env,gamma,eps);
-    print('done val it')
+    #print('start val it')
+    #V, policy= value_iteration(env,gamma,eps);
+    #print('done val it')
     # Simulate the shortest path starting from position A
-    method = 'ValIter';
-    start  = (0,0,6,5);
-    path = env.simulate(start, policy, method);
-
-    input('stopp')
+    #method = 'ValIter';
+    #start  = (0,0,6,5);
+    #path = env.simulate(start, policy, method);
+    #print(path)
+    #input('stopp')
 
     # Dynamic programming
     horizon = 20
@@ -583,6 +602,6 @@ if __name__ == '__main__':
     method = 'DynProg';
     start  = (0,0,6,5);
     path = env.simulate(start, policy, method)
-
+    print(path)
     # Show the shortest path
     animate_solution(maze, path)
