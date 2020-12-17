@@ -27,6 +27,17 @@ import random
 import pdb
 import tqdm
 
+def running_average(x, N):
+    ''' Function used to compute the running average
+        of the last N elements of a vector x
+    '''
+    if len(x) >= N:
+        y = np.copy(x)
+        y[N-1:] = np.convolve(x, np.ones((N, )) / N, mode='valid')
+    else:
+        y = np.zeros_like(x)
+    return y
+
 
 ### Experience class ###
 
@@ -83,7 +94,7 @@ class ExperienceReplayBuffer(object):
         # tuple of 5 elements where each element is a list of n elements.
         return zip(*batch)
 
-def fillExperienceBuffer( L, buffer ):
+def fillExperienceBuffer( L, buffer, randomAgent):
     for e in range(L):
 
         state = env.reset()                    # Reset environment, returns
@@ -116,18 +127,25 @@ def fillExperienceBuffer( L, buffer ):
 ### Neural Network ###
 class MyNetwork(nn.Module):
     """ Create a feedforward neural network """
-    def __init__(self, no_states, no_actions, hidden_layer_1_size = 20 , hidden_layer_1_output_size = 10 ):
+    def __init__(self, no_states, no_actions, hidden_layer_1_size = 50 , output_size = 10 ):
         super().__init__()
 
         # Create input layer with ReLU activation
-        self.input_layer = nn.Linear(no_states, hidden_layer_1_size)
+        self.input_layer = nn.Linear(no_states, hidden_layer_1_size, bias= True)
         self.activation = nn.ReLU()
 
+        #hidden_layer_1_size = 50
+        hidden_layer_1_output_size = 100
+
         # Create input layer with ReLU activation
-        self.hidden_layer_1 = nn.Linear(hidden_layer_1_size, hidden_layer_1_output_size)
+        self.hidden_layer_1 = nn.Linear(hidden_layer_1_size, hidden_layer_1_output_size, bias= True)
+
+        hidden_layer_2_output_size = 50
+        # Create input layer with ReLU activation
+        self.hidden_layer_2 = nn.Linear(hidden_layer_1_output_size, hidden_layer_2_output_size, bias= True)
 
         # Create output layer
-        self.output_layer = nn.Linear(hidden_layer_1_output_size, no_actions)
+        self.output_layer = nn.Linear(hidden_layer_2_output_size, no_actions, bias= True)
 
     def forward(self, states):
         # Function used to compute the forward pass
@@ -140,8 +158,11 @@ class MyNetwork(nn.Module):
         h1 = self.hidden_layer_1(l1)
         h1 = self.activation(h1)
 
+        h2 = self.hidden_layer_2(h1)
+        h2 = self.activation(h2)
+
         # Compute output layer
-        out = self.output_layer(h1)
+        out = self.output_layer(h2)
         return out
 
 def computeEps(k, eps_max, eps_min, N_episodes, per = 0.95, linear = True):
@@ -190,120 +211,138 @@ def computeTarget(states, actions, rewards, next_states, dones, Q_theta_p, gamma
     return y
 
 
-
-
 ### CREATE RL ENVIRONMENT ###
 # Import and initialize the discrete Lunar Laner Environment
 env = gym.make('LunarLander-v2')
 env.reset()
 
-# Parameters
-N_episodes = 1000                             # Number of episodes
-gamma = 0.95                       # Value of the discount factor
-n_ep_running_average = 50                    # Running average of 50 episodes
-n_actions = env.action_space.n               # Number of available actions
-dim_state = len(env.observation_space.high)  # State dimensionality
+def main():
+
+    # Parameters
+    N_episodes = 200                             # Number of episodes
+    gamma = 0.95                       # Value of the discount factor
+    n_ep_running_average = 50                    # Running average of 50 episodes
+    n_actions = env.action_space.n               # Number of available actions
+    dim_state = len(env.observation_space.high)  # State dimensionality
 
 
-eps_max = 0.99
-eps_min = 0.05
+    eps_max = 0.99
+    eps_min = 0.05
 
-C = 0
+    C = 0
 
-# We will use these variables to compute the average episodic reward and
-# the average number of steps per episode
-episode_reward_list = []       # this list contains the total reward per episode
-episode_number_of_steps = []   # this list contains the number of steps per episode
+    # We will use these variables to compute the average episodic reward and
+    # the average number of steps per episode
+    episode_reward_list = []       # this list contains the total reward per episode
+    episode_number_of_steps = []   # this list contains the number of steps per episode
 
-# Random agent initialization
-randomAgent = RandomAgent(n_actions)
+    # Random agent initialization
+    randomAgent = RandomAgent(n_actions)
 
-### Create Experience replay buffer ###
-buffer = ExperienceReplayBuffer(maximum_length=15000)
+    ### Create Experience replay buffer ###
+    buffer = ExperienceReplayBuffer(maximum_length=30000)
 
-TE = trange(N_episodes, desc='Episode: ', leave=True)
+    TE = trange(N_episodes, desc='Episode: ', leave=True)
 
-### Create network ###
-#network = MyNetwork(input_size=n, output_size=m)
+    ### Create network ###
+    #network = MyNetwork(input_size=n, output_size=m)
 
-L = 1000
-N = 20#4-128
-C = L/N
+    L = 5000
+    N = 50#4-128
+    C = L/N
 
-buffer = fillExperienceBuffer( L, buffer )
-
-Q_theta = MyNetwork(dim_state, n_actions)
-Q_theta_p = MyNetwork(dim_state, n_actions)
+    buffer = fillExperienceBuffer( L, buffer, randomAgent )
+    #torch.save(buffer)
 
 
-### Create optimizer ###
-optimizer = optim.Adam(Q_theta.parameters(), lr=0.0001) # 10-3 and 10^-4
+    Q_theta = MyNetwork(dim_state, n_actions)
+    Q_theta_p = MyNetwork(dim_state, n_actions)
+
+    Q_theta_best = None
+    reward_avg_max = -1000000
 
 
-
-### TRAINING ###
-# Perform training only if we have more than 3 elements in the buffer
-for k in TE:
-    done = False
-    state = env.reset()
-    total_episode_reward = 0.
-    t = 0
-
-    while not done:
+    ### Create optimizer ###
+    optimizer = optim.Adam(Q_theta.parameters(), lr=0.0001) # 10-3 and 10^-4
 
 
-        state_tensor = torch.tensor([state],
-                                    requires_grad=False,
-                                    dtype=torch.float32)
-
-        action_distribution = Q_theta(state_tensor)
-        action = epsGreedyAction(k, eps_max, eps_min, N_episodes, action_distribution)
-
-        next_state, reward, done, _ = env.step(action)
-
-        exp = Experience(state, action, reward, next_state, done)
-        buffer.append(exp)
-
-        # Sample a batch of 3 elements
-        states, actions, rewards, next_states, dones = buffer.sample_batch(n=N)
-
-        # TD updated values
-        y = computeTarget(states, actions, rewards, next_states, dones, Q_theta_p, gamma)
+    training_rewards = []
 
 
-        # Training process, set gradients to 0
-        optimizer.zero_grad()
+    ### TRAINING ###
+    # Perform training only if we have more than 3 elements in the buffer
+    for k in TE:
+        done = False
+        state = env.reset()
+        total_episode_reward = 0.
+        t = 0
 
-        # Compute output of the network given the states batch
-        action_values = Q_theta(torch.tensor(states,
-                        requires_grad=False,
-                        dtype=torch.float32))
-
-        action_values = [ action_values[i][actions[i]] for i in range (action_values.shape[0])  ]
-
-
-        # Compute loss function
-        #pdb.set_trace()
-        loss = nn.functional.mse_loss(torch.tensor(y, requires_grad=True),
-                        torch.tensor(action_values, requires_grad=True))
-
-        # Compute gradient
-        loss.backward()
-
-        # Clip gradient norm to 1
-        nn.utils.clip_grad_norm_(Q_theta.parameters(), max_norm=1.) # between 0.5 and 2
-
-        # Perform backward pass (backpropagation)
-        optimizer.step()
-
-        if np.mod(t, C) == 0:
-            Q_theta_p = Q_theta
-
-        t+= 1
-        state = next_s
-
-torch.save(Q_theta, 'neural-network-1.pth')
+        while not done:
 
 
-# Close all the windows
-env.close()
+            state_tensor = torch.tensor([state],
+                                        requires_grad=False,
+                                        dtype=torch.float32)
+
+            action_distribution = Q_theta(state_tensor)
+            action = epsGreedyAction(k, eps_max, eps_min, N_episodes, action_distribution)
+
+            next_state, reward, done, _ = env.step(action)
+
+            exp = Experience(state, action, reward, next_state, done)
+            buffer.append(exp)
+
+            # Sample a batch of 3 elements
+            states, actions, rewards, next_states, dones = buffer.sample_batch(n=N)
+
+            # TD updated values
+            y = computeTarget(states, actions, rewards, next_states, dones, Q_theta_p, gamma)
+
+
+            # Training process, set gradients to 0
+            optimizer.zero_grad()
+
+            # Compute output of the network given the states batch
+            action_values = Q_theta(torch.tensor(states,
+                            requires_grad=False,
+                            dtype=torch.float32))
+
+            action_values = [ action_values[i][actions[i]] for i in range (action_values.shape[0])  ]
+
+
+            # Compute loss function
+            #pdb.set_trace()
+            loss = nn.functional.mse_loss(torch.tensor(y, requires_grad=True),
+                            torch.tensor(action_values, requires_grad=True))
+
+            # Compute gradient
+            loss.backward()
+
+            # Clip gradient norm to 1
+            nn.utils.clip_grad_norm_(Q_theta.parameters(), max_norm=1.) # between 0.5 and 2
+
+            # Perform backward pass (backpropagation)
+            optimizer.step()
+
+            if np.mod(t, C) == 0:
+                Q_theta_p = Q_theta
+                #pdb.set_trace()
+
+            t+= 1
+            state = next_state
+
+            training_rewards.append(reward)
+            reward_avg = running_average(training_rewards, 50)[-1]
+
+            if reward_avg > reward_avg_max:
+                print(reward_avg)
+                reward_avg_max = reward_avg
+                Q_theta_best = Q_theta
+                torch.save(Q_theta_best, 'neural-network-1.pth')
+
+
+    # Close all the windows
+    env.close()
+
+if __name__ == "__main__":
+    main()
