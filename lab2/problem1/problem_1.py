@@ -165,6 +165,9 @@ class MyNetwork(nn.Module):
         out = self.output_layer(h2)
         return out
 
+
+
+
 def computeEps(k, eps_max, eps_min, N_episodes, per = 0.95, linear = True):
     if linear:
         Z = per*N_episodes
@@ -177,7 +180,7 @@ def computeEps(k, eps_max, eps_min, N_episodes, per = 0.95, linear = True):
 
 def epsGreedyAction(k, eps_max, eps_min, N_episodes, action_distribution):
 
-    eps_k = computeEps(k, eps_max, eps_min, N_episodes, 0.95, True)
+    eps_k = computeEps(k, eps_max, eps_min, N_episodes, 0.95, False)
     u = np.random.uniform(0, 1)
 
     if u < eps_k:
@@ -219,7 +222,7 @@ env.reset()
 def main():
 
     # Parameters
-    N_episodes = 200                             # Number of episodes
+    N_episodes = 500                             # Number of episodes
     gamma = 0.95                       # Value of the discount factor
     n_ep_running_average = 50                    # Running average of 50 episodes
     n_actions = env.action_space.n               # Number of available actions
@@ -247,8 +250,8 @@ def main():
     ### Create network ###
     #network = MyNetwork(input_size=n, output_size=m)
 
-    L = 5000
-    N = 50#4-128
+    L = 50
+    N = 30#4-128
     C = L/N
 
     buffer = fillExperienceBuffer( L, buffer, randomAgent )
@@ -266,8 +269,6 @@ def main():
     optimizer = optim.Adam(Q_theta.parameters(), lr=0.0001) # 10-3 and 10^-4
 
 
-    training_rewards = []
-
 
     ### TRAINING ###
     # Perform training only if we have more than 3 elements in the buffer
@@ -278,7 +279,6 @@ def main():
         t = 0
 
         while not done:
-
 
             state_tensor = torch.tensor([state],
                                         requires_grad=False,
@@ -329,16 +329,20 @@ def main():
                 #pdb.set_trace()
 
             t+= 1
+            total_episode_reward +=reward
             state = next_state
 
-            training_rewards.append(reward)
-            reward_avg = running_average(training_rewards, 50)[-1]
 
-            if reward_avg > reward_avg_max:
-                print(reward_avg)
-                reward_avg_max = reward_avg
-                Q_theta_best = Q_theta
-                torch.save(Q_theta_best, 'neural-network-1.pth')
+        episode_reward_list.append(total_episode_reward)
+        episode_number_of_steps.append(t)
+        reward_avg = running_average(episode_reward_list, 50)[-1]
+
+        if reward_avg > reward_avg_max:
+            print("Best running avg so far: ", reward_avg)
+            reward_avg_max = reward_avg
+            Q_theta_best = Q_theta
+
+    torch.save(Q_theta_best, 'neural-network-1.pth')
 
 
     # Close all the windows
