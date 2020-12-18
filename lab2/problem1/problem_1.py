@@ -127,7 +127,7 @@ def fillExperienceBuffer( L, buffer, randomAgent):
 ### Neural Network ###
 class MyNetwork(nn.Module):
     """ Create a feedforward neural network """
-    def __init__(self, no_states, no_actions, hidden_layer_1_size = 50 , output_size = 10 ):
+    def __init__(self, no_states, no_actions, hidden_layer_1_size = 64 , output_size = 10 ):
         super().__init__()
 
         # Create input layer with ReLU activation
@@ -135,12 +135,12 @@ class MyNetwork(nn.Module):
         self.activation = nn.ReLU()
 
         #hidden_layer_1_size = 50
-        hidden_layer_1_output_size = 100
+        hidden_layer_1_output_size = 64
 
         # Create input layer with ReLU activation
         self.hidden_layer_1 = nn.Linear(hidden_layer_1_size, hidden_layer_1_output_size, bias= True)
 
-        hidden_layer_2_output_size = 50
+        hidden_layer_2_output_size = 64
         # Create input layer with ReLU activation
         self.hidden_layer_2 = nn.Linear(hidden_layer_1_output_size, hidden_layer_2_output_size, bias= True)
 
@@ -223,7 +223,7 @@ def main():
 
     # Parameters
     N_episodes = 500                             # Number of episodes
-    gamma = 0.95                       # Value of the discount factor
+    gamma = 0.99                      # Value of the discount factor
     n_ep_running_average = 50                    # Running average of 50 episodes
     n_actions = env.action_space.n               # Number of available actions
     dim_state = len(env.observation_space.high)  # State dimensionality
@@ -242,19 +242,20 @@ def main():
     # Random agent initialization
     randomAgent = RandomAgent(n_actions)
 
+    L=20000 #5000-30000
+    
     ### Create Experience replay buffer ###
-    buffer = ExperienceReplayBuffer(maximum_length=30000)
+    buffer = ExperienceReplayBuffer(maximum_length=L)
 
     TE = trange(N_episodes, desc='Episode: ', leave=True)
 
     ### Create network ###
     #network = MyNetwork(input_size=n, output_size=m)
-
-    L = 50
-    N = 30#4-128
+ 
+    N = 32 #4-128
     C = L/N
 
-    buffer = fillExperienceBuffer( L, buffer, randomAgent )
+    buffer = fillExperienceBuffer(32, buffer, randomAgent )
     #torch.save(buffer)
 
 
@@ -266,12 +267,14 @@ def main():
 
 
     ### Create optimizer ###
-    optimizer = optim.Adam(Q_theta.parameters(), lr=0.0001) # 10-3 and 10^-4
+    optimizer = optim.Adam(Q_theta.parameters(), lr=0.0005) # 10-3 and 10^-4
 
 
 
     ### TRAINING ###
     # Perform training only if we have more than 3 elements in the buffer
+    training_steps=0
+    
     for k in TE:
         done = False
         state = env.reset()
@@ -297,23 +300,27 @@ def main():
 
             # TD updated values
             y = computeTarget(states, actions, rewards, next_states, dones, Q_theta_p, gamma)
-
+            y_tensor=torch.tensor(y, requires_grad=False, dtype=torch.float32)
 
             # Training process, set gradients to 0
             optimizer.zero_grad()
 
             # Compute output of the network given the states batch
-            action_values = Q_theta(torch.tensor(states,
+            batch_action_values = Q_theta(torch.tensor(states,
                             requires_grad=False,
                             dtype=torch.float32))
 
-            action_values = [ action_values[i][actions[i]] for i in range (action_values.shape[0])  ]
-
+            index_tensor = torch.tensor(np.arange(0, N, 1))
+            actions_tensor = torch.tensor(actions, requires_grad=False, dtype=torch.int64)
+            
+            #action_values = [batch_action_values[i][actions[i]] for i in range (batch_action_values.shape[0]) ]
+            
+            action_values=batch_action_values[index_tensor, actions_tensor]
+            #action_values_tensor=torch.tensor(action_values, requires_grad=False, dtype=torch.float32)
 
             # Compute loss function
             #pdb.set_trace()
-            loss = nn.functional.mse_loss(torch.tensor(y, requires_grad=True),
-                            torch.tensor(action_values, requires_grad=True))
+            loss = nn.functional.mse_loss(action_values, y_tensor)
 
             # Compute gradient
             loss.backward()
@@ -323,8 +330,9 @@ def main():
 
             # Perform backward pass (backpropagation)
             optimizer.step()
-
-            if np.mod(t, C) == 0:
+            training_steps+=1
+            
+            if np.mod(training_steps, C) == 0:
                 Q_theta_p = Q_theta
                 #pdb.set_trace()
 
@@ -335,14 +343,17 @@ def main():
 
         episode_reward_list.append(total_episode_reward)
         episode_number_of_steps.append(t)
-        reward_avg = running_average(episode_reward_list, 50)[-1]
-
-        if reward_avg > reward_avg_max:
-            print("Best running avg so far: ", reward_avg)
-            reward_avg_max = reward_avg
-            Q_theta_best = Q_theta
+        if k>50:
+            reward_avg = running_average(episode_reward_list, 50)[-1]
+            print ("Current reward avg", reward_avg, "episode:", k, "number of steps", t)
+            if reward_avg > reward_avg_max:
+                print("Best running avg so far: ", reward_avg, "episode:", k)
+                reward_avg_max = reward_avg
+                Q_theta_best = Q_theta
 
     torch.save(Q_theta_best, 'neural-network-1.pth')
+    print(episode_reward_list)
+    print(episode_number_of_steps)
 
 
     # Close all the windows
