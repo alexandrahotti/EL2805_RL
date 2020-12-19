@@ -19,56 +19,65 @@ import pdb
 import tqdm
 import matplotlib.pyplot as plt
 from math import pi
-from problem_1_working import MyNetwork
+from problem_1 import MyNetwork
 from mpl_toolkits.mplot3d import Axes3D
 
 
 def opt_pol_analysis(Q_theta, max_type):
-    y=[0.15*k for k in range(10)]
+    y=[0.15*k for k in range(11)]
     
     step_omega=2*pi/10
-    omega=[-pi+step_omega*k for k in range(10)]
+    omega=[-pi+step_omega*k for k in range(11)]
     
     states=[]
-    states_matrix=np.array([[0 for i in range(10)] for j in range(10)])
+    states_matrix=np.array([[0 for i in range(11)] for j in range(11)])
     
     y_qmax_list=[]
     omega_qmax_list=[]
     y_amax_list=[]
     omega_amax_list=[]
-    k=1
+    k=0
     
-    for i in range(10):
-        for j in range(10):
+    for i in range(11):
+        for j in range(11):
             states.append((0,y[i],0,0,omega[j],0,0,0))
             states_matrix[i][j]=k
             k+=1
             #print(states)
     states_tensor=torch.tensor(states, requires_grad=False, dtype=torch.float32)
-    print(states_matrix)
+    #print(states_matrix)
     
     #print(states_tensor.shape)
-    
+    print(states_matrix)
     if max_type=="Q":
         Q_max=[]
-        for i in range(1,101):
-            max_value=float(torch.max(Q_theta(states_tensor)[i-1]))
+        for i in range(121):
+            max_value=float(torch.max(Q_theta(states_tensor)[i]))
             Q_max.append(max_value)
             y_qmax, omega_qmax=np.where(states_matrix==i)
-            y_qmax_list.append(int(y_qmax))
-            omega_qmax_list.append(int(omega_qmax))
+            y_qmax_list.append(y[int(y_qmax)])
+            omega_qmax_list.append(omega[int(omega_qmax)])
             
             
         
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.plot(y_qmax_list, omega_qmax_list, Q_max)
+        ax.scatter(omega_qmax_list,y_qmax_list, Q_max)
+        ax.set_xlabel('Lander angle')
+        ax.set_ylabel('lander height')
+        ax.set_zlabel('Max value')
+        ax.set_title('Max value Q_max=f(omega, y)')
+        
+        print("y_qmax", y_qmax_list)
+        print("omega_qmax", omega_qmax_list)
+        print("q_max", Q_max)
+        
         plt.show()
     
     else:
         a_max=[]
-        for i in range(1,101):
-            max_action=int(torch.argmax(Q_theta(states_tensor)[i-1]))
+        for i in range(121):
+            max_action=int(torch.argmax(Q_theta(states_tensor)[i]))
             #print(max_action)
             a_max.append(max_action)
             y_amax, omega_amax=np.where(states_matrix==i)
@@ -78,25 +87,16 @@ def opt_pol_analysis(Q_theta, max_type):
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.plot(y_amax_list, omega_amax_list, a_max)
-        plt.show()   
-            
+        ax.scatter(omega_amax_list, y_amax_list, a_max)
+        ax.set_xlabel('Lander angle')
+        ax.set_ylabel('lander height')
+        ax.set_zlabel('optimal action')
+        ax.set_title('Optimal action a_max=f(omega, y)')
+        plt.show() 
+
     
-Q_theta=torch.load("first_neural-network-1.pth")
+Q_theta=torch.load("neural-network-1.pth")
 
-y=[0.15*k for k in range(10)]
-    
-step_omega=2*pi/100
-omega=[-pi+step_omega*k for k in range(100)]
-
-states=[]
-
-for i in range(10):
-        for j in range(10):
-            states.append((0,y[i],0,0,omega[j],0,0,0))
-            #print(states)
-states_tensor=torch.tensor(states, requires_grad=False, dtype=torch.float32)
-#print(Q_theta(states_tensor)[88])
 opt_pol_analysis(Q_theta, "Q")
     
 #x=np.array([[1,2,3,4],[5,6,7,8]])
