@@ -1,3 +1,4 @@
+
 # Copyright [2020] [KTH Royal Institute of Technology] Licensed under the
 # Educational Community License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may
@@ -26,6 +27,7 @@ from DQN_agent import RandomAgent
 import random
 import pdb
 import tqdm
+import matplotlib.pyplot as plt
 
 def running_average(x, N):
     ''' Function used to compute the running average
@@ -350,14 +352,38 @@ def main():
                 print("Best running avg so far: ", reward_avg, "episode:", k)
                 reward_avg_max = reward_avg
                 Q_theta_best = Q_theta
+            if reward_avg>100:
+                Q_theta_best=Q_theta
+                break
 
     torch.save(Q_theta_best, 'neural-network-1.pth')
-    print(episode_reward_list)
-    print(episode_number_of_steps)
+    #print(episode_reward_list)
+    #print(episode_number_of_steps)
 
-
+    
     # Close all the windows
     env.close()
-
+    
+    # Plot Rewards and steps
+    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(16, 9))
+    ax[0].plot([i for i in range(1, len(episode_reward_list)+1)], episode_reward_list, label='Episode reward')
+    ax[0].plot([i for i in range(1, len(episode_reward_list)+1)], running_average(
+        episode_reward_list, n_ep_running_average), label='Avg. episode reward')
+    ax[0].set_xlabel('Episodes')
+    ax[0].set_ylabel('Total reward')
+    ax[0].set_title('Total Reward vs Episodes')
+    ax[0].legend()
+    ax[0].grid(alpha=0.3)
+    
+    ax[1].plot([i for i in range(1, len(episode_reward_list)+1)], episode_number_of_steps, label='Steps per episode')
+    ax[1].plot([i for i in range(1, len(episode_reward_list)+1)], running_average(
+        episode_number_of_steps, n_ep_running_average), label='Avg. number of steps per episode')
+    ax[1].set_xlabel('Episodes')
+    ax[1].set_ylabel('Total number of steps')
+    ax[1].set_title('Total number of steps vs Episodes')
+    ax[1].legend()
+    ax[1].grid(alpha=0.3)
+    plt.show()
+    
 if __name__ == "__main__":
     main()
