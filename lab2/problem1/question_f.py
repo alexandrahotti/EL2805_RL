@@ -26,8 +26,8 @@ from mpl_toolkits.mplot3d import Axes3D
 def opt_pol_analysis(Q_theta, max_type):
     y=[0.15*k for k in range(10)]
     
-    step_omega=2*pi/100
-    omega=[-pi+step_omega*k for k in range(100)]
+    step_omega=2*pi/10
+    omega=[-pi+step_omega*k for k in range(10)]
     
     states=[]
     states_matrix=np.array([[0 for i in range(10)] for j in range(10)])
@@ -69,7 +69,7 @@ def opt_pol_analysis(Q_theta, max_type):
         a_max=[]
         for i in range(1,101):
             max_action=int(torch.argmax(Q_theta(states_tensor)[i-1]))
-            print(max_action)
+            #print(max_action)
             a_max.append(max_action)
             y_amax, omega_amax=np.where(states_matrix==i)
             #print(y_amax, omega_amax)
@@ -97,7 +97,7 @@ for i in range(10):
             #print(states)
 states_tensor=torch.tensor(states, requires_grad=False, dtype=torch.float32)
 #print(Q_theta(states_tensor)[88])
-opt_pol_analysis(Q_theta, "A")
+opt_pol_analysis(Q_theta, "Q")
     
 #x=np.array([[1,2,3,4],[5,6,7,8]])
 #x,y=np.where(x==5)
