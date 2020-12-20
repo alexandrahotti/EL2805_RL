@@ -78,10 +78,6 @@ def opt_pol_analysis(Q_theta, max_type):
         ax.set_zlabel('Max value')
         ax.set_title('Max value Q_max=f(omega, y)')
         
-        print("y_qmax", y_qmax_list)
-        print("omega_qmax", omega_qmax_list)
-        print("q_max", Q_max)
-        
         plt.show()
     
     #if we want to plot the actions
@@ -108,7 +104,7 @@ def opt_pol_analysis(Q_theta, max_type):
     
 Q_theta=torch.load("neural-network-1.pth")
 
-opt_pol_analysis(Q_theta, "Q")
+opt_pol_analysis(Q_theta, "a")
     
 
 
