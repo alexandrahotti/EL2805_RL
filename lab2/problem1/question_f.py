@@ -24,36 +24,46 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 def opt_pol_analysis(Q_theta, max_type):
+    
+    #y and w values used for the plot 
     y=[0.15*k for k in range(11)]
     
     step_omega=2*pi/10
     omega=[-pi+step_omega*k for k in range(11)]
     
+    #create a state list 
     states=[]
+    
+    #create a matrix state_matrix where state_matrix[y,w] corresponds to the index of the state corresponding to y,w in the state list 
     states_matrix=np.array([[0 for i in range(11)] for j in range(11)])
     
+    #lists used for the plot
     y_qmax_list=[]
     omega_qmax_list=[]
     y_amax_list=[]
     omega_amax_list=[]
     k=0
     
+    #fill the state list and fill the state_matrix with the indices 
     for i in range(11):
         for j in range(11):
             states.append((0,y[i],0,0,omega[j],0,0,0))
             states_matrix[i][j]=k
             k+=1
-            #print(states)
+            
     states_tensor=torch.tensor(states, requires_grad=False, dtype=torch.float32)
-    #print(states_matrix)
     
-    #print(states_tensor.shape)
-    print(states_matrix)
+    
+    
+    #If we want to plot the Q values 
     if max_type=="Q":
         Q_max=[]
         for i in range(121):
+            #compute the max value for every state
             max_value=float(torch.max(Q_theta(states_tensor)[i]))
             Q_max.append(max_value)
+            
+            #search the y,w corresponding to the state for which we computed the max value 
             y_qmax, omega_qmax=np.where(states_matrix==i)
             y_qmax_list.append(y[int(y_qmax)])
             omega_qmax_list.append(omega[int(omega_qmax)])
@@ -74,6 +84,7 @@ def opt_pol_analysis(Q_theta, max_type):
         
         plt.show()
     
+    #if we want to plot the actions
     else:
         a_max=[]
         for i in range(121):
@@ -99,16 +110,7 @@ Q_theta=torch.load("neural-network-1.pth")
 
 opt_pol_analysis(Q_theta, "Q")
     
-#x=np.array([[1,2,3,4],[5,6,7,8]])
-#x,y=np.where(x==5)
-#print(int(x), int(y))
-#y=np.array([0,1,1,1])
-#z=np.array([10,8,7,10])
-#
-#fig = plt.figure()
-#ax = fig.add_subplot(111, projection='3d')
-#ax.plot(x,y,z)
-#plt.show()
+
 
 
     
