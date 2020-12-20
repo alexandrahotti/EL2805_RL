@@ -1,0 +1,1 @@
+N_episodes = 400 gamma = 0.99  L = 15000 N = 30 eps_min = 0.05 eps_max = 0.99 C = 500.0
